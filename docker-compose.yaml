@@ -10,12 +10,12 @@ services:
     image: nginx
     ports:
       - "8085:80"
-    depends_on: [ fluentd ]
-    logging:
-      driver: "fluentd"
-      options:
-        fluentd-address: localhost:24224
-        tag: fluent
+#    depends_on: [ fluentd ]
+#    logging:
+#      driver: "fluentd"
+#      options:
+#        fluentd-address: localhost:24224
+#        tag: fluent
 
   # ===== Custom Applications =====
   load:
@@ -42,12 +42,12 @@ services:
       context: workshop-server
     ports:
       - "8080-8081:8080"
-    depends_on: [ fluentd ]
-    logging:
-      driver: "fluentd"
-      options:
-        fluentd-address: localhost:24224
-        tag: fluent
+#    depends_on: [ fluentd ]
+#    logging:
+#      driver: "fluentd"
+#      options:
+#        fluentd-address: localhost:24224
+#        tag: fluent
 
 
 
