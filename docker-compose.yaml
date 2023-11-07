@@ -1,0 +1,250 @@
+version: "3.9"
+networks:
+  default:
+    name: elastic
+    external: false
+services:
+
+  # ===== Standard Web Server =====
+  nginx:
+    image: nginx
+    ports:
+      - "8085:80"
+    depends_on: [ fluentd ]
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: fluent
+
+  # ===== Custom Applications =====
+  load:
+    image: workshop-load:devlocal
+    build:
+      context: .
+      dockerfile: workshop-load/Dockerfile
+    environment:
+      LOAD_USERS: 5
+      SERVER_ENDPOINTS: "workshop-example-server-1:8080,workshop-example-server-2:8080"
+    restart: always
+    depends_on: [ fluentd ]
+#    logging:
+#      driver: "fluentd"
+#      options:
+#        fluentd-address: localhost:24224
+#        tag: fluent
+
+  server:
+    image: workshop-server:devlocal
+    deploy:
+      replicas: 2
+    build:
+      context: workshop-server
+    ports:
+      - "8080-8081:8080"
+    depends_on: [ fluentd ]
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: fluent
+
+
+
+  # ===== Logging services =====
+  fluentd:
+    build:
+      context: ./configs/fluentd
+    volumes:
+      - ./configs/fluentd/conf:/fluentd/etc
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    restart: always
+
+  setup:
+    profiles:
+      - all
+      - logging
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+    user: "0"
+    command: >
+      bash -c '
+        if [ x${ELASTIC_PASSWORD} == x ]; then
+          echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
+          exit 1;
+        elif [ x${KIBANA_PASSWORD} == x ]; then
+          echo "Set the KIBANA_PASSWORD environment variable in the .env file";
+          exit 1;
+        fi;
+        if [ ! -f config/certs/ca.zip ]; then
+          echo "Creating CA";
+          bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
+          unzip config/certs/ca.zip -d config/certs;
+        fi;
+        if [ ! -f config/certs/certs.zip ]; then
+          echo "Creating certs";
+          echo -ne \
+          "instances:\n"\
+          "  - name: es01\n"\
+          "    dns:\n"\
+          "      - workshop-example-elastic-1\n"\
+          "      - elastic\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "  - name: kibana\n"\
+          "    dns:\n"\
+          "      - workshop-example-kibana-1\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          > config/certs/instances.yml;
+          bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+          unzip config/certs/certs.zip -d config/certs;
+        fi;
+        echo "Setting file permissions"
+        chown -R root:root config/certs;
+        find . -type d -exec chmod 750 \{\} \;;
+        find . -type f -exec chmod 640 \{\} \;;
+        touch config/certs/ready
+        echo "Waiting for Elasticsearch availability";
+        until curl -s --cacert config/certs/ca/ca.crt https://elastic:9200 | grep -q "missing authentication credentials"; do sleep 5; done;
+        echo "Setting kibana_system password";
+        until curl -s -X POST --cacert config/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" https://elastic:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
+        echo "All done!";
+      '
+    healthcheck:
+      test: [ "CMD-SHELL", "[ -f config/certs/ready ]" ]
+      interval: 1s
+      timeout: 5s
+      retries: 120
+
+  elastic:
+    profiles:
+      - all
+      - logging
+    depends_on:
+      setup:
+        condition: service_healthy
+    image: elasticsearch:${STACK_VERSION}
+    environment:
+      node.name: es01
+      discovery.type: single-node
+
+      xpack.security.enabled: true
+      xpack.security.http.ssl.enabled: true
+      xpack.security.http.ssl.key: certs/es01/es01.key
+      xpack.security.http.ssl.certificate: certs/es01/es01.crt
+      xpack.security.http.ssl.certificate_authorities: certs/ca/ca.crt
+      xpack.security.transport.ssl.enabled: true
+      xpack.security.transport.ssl.key: certs/es01/es01.key
+      xpack.security.transport.ssl.certificate: certs/es01/es01.crt
+      xpack.security.transport.ssl.certificate_authorities: certs/ca/ca.crt
+      xpack.security.transport.ssl.verification_mode: certificate
+
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      # Bootstrap password.
+      # Used to initialize the keystore during the initial startup of
+      # Elasticsearch. Ignored on subsequent runs.
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
+    ports:
+      - "9200:9200"
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+      - esdata01:/usr/share/elasticsearch/data
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "--insecure", "-u", "elastic:elastic", "https://localhost:9200/_cluster/health?wait_for_status=green&timeout=1s" ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+
+  kibana:
+    profiles:
+      - all
+      - logging
+    image: kibana:${STACK_VERSION}
+    restart: always
+    environment:
+      SERVERNAME: kibana
+      ELASTICSEARCH_HOSTS: https://workshop-example-elastic-1:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${KIBANA_PASSWORD}
+      KIBANA_SYSTEM_PASSWORD: kibana
+      ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES: config/certs/ca/ca.crt
+    ports:
+      - "5601:5601"
+    volumes:
+      - certs:/usr/share/kibana/config/certs
+
+
+      # ===== Monitoring services =====
+  prometheus:
+    profiles:
+      - all
+      - monitoring
+    image: prom/prometheus
+    volumes:
+      - ./configs/prometheus:/etc/prometheus
+      - prom-data:/prometheus
+    ports:
+      - "9090:9090"
+  grafana:
+    profiles:
+      - all
+      - monitoring
+    image: grafana/grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning/
+      - ./configs/grafana/custom.ini:/custom.ini
+    ports:
+      - "3000:3000"
+    environment:
+      GF_PATHS_CONFIG: /custom.ini
+
+  node-exporter:
+    profiles:
+      - all
+      - alerting
+    image: prom/node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - --collector.filesystem.ignored-mount-points
+      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    ports:
+      - "9100:9100"
+    restart: always
+    deploy:
+      mode: global
+
+  alertmanager:
+    image: prom/alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./configs/alertmanager/:/etc/alertmanager/
+    restart: always
+    command:
+      - '-config.file=/etc/alertmanager/config.yml'
+      - '-storage.path=/alertmanager'
+    deploy:
+      mode: global
+
+volumes:
+  grafana-data:
+    name: observability-workshop-grafana-data
+  prom-data:
+    name: observability-workshop-prom-data
+  esdata01:
+    name: observability-workshop-esdata01
+  certs:
+    name: observability-workshop-certs
