@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// Add static nginx endpoint to see nginx logs as well
-	go doUserRequests("workshop-example-nginx-1", 99)
+	go doUserRequests("workshop-logging-nginx-1", 99)
 
 	for {
 		time.Sleep(250 * time.Millisecond)

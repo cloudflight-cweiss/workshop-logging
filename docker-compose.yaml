@@ -15,7 +15,7 @@ services:
 #      driver: "fluentd"
 #      options:
 #        fluentd-address: localhost:24224
-#        tag: fluent
+#        tag: fluent  
 
   # ===== Custom Applications =====
   load:
@@ -25,7 +25,7 @@ services:
       dockerfile: workshop-load/Dockerfile
     environment:
       LOAD_USERS: 5
-      SERVER_ENDPOINTS: "workshop-example-server-1:8080,workshop-example-server-2:8080"
+      SERVER_ENDPOINTS: "workshop-logging-server-1:8080,workshop-logging-server-2:8080"
     restart: always
     depends_on: [ fluentd ]
 #    logging:
@@ -90,14 +90,14 @@ services:
           "instances:\n"\
           "  - name: es01\n"\
           "    dns:\n"\
-          "      - workshop-example-elastic-1\n"\
+          "      - workshop-logging-elastic-1\n"\
           "      - elastic\n"\
           "      - localhost\n"\
           "    ip:\n"\
           "      - 127.0.0.1\n"\
           "  - name: kibana\n"\
           "    dns:\n"\
-          "      - workshop-example-kibana-1\n"\
+          "      - workshop-logging-kibana-1\n"\
           "      - localhost\n"\
           "    ip:\n"\
           "      - 127.0.0.1\n"\
@@ -170,7 +170,7 @@ services:
     restart: always
     environment:
       SERVERNAME: kibana
-      ELASTICSEARCH_HOSTS: https://workshop-example-elastic-1:9200
+      ELASTICSEARCH_HOSTS: https://workshop-logging-elastic-1:9200
       ELASTICSEARCH_USERNAME: kibana_system
       ELASTICSEARCH_PASSWORD: ${KIBANA_PASSWORD}
       KIBANA_SYSTEM_PASSWORD: kibana

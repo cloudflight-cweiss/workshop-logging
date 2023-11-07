@@ -17,13 +17,13 @@ scrape_configs:
   - job_name: 'nginx-exporter'
     static_configs:
       - targets: [
-        'workshop-example-server-1:8080',
-        'workshop-example-server-2:8080'
+        'workshop-logging-server-1:8080',
+        'workshop-logging-server-2:8080'
       ]
 
   - job_name: 'workshop-servers'
     static_configs:
       - targets: [
-        'workshop-example-server-1:8080',
-        'workshop-example-server-2:8080'
+        'workshop-logging-server-1:8080',
+        'workshop-logging-server-2:8080'
       ]
