@@ -10,12 +10,12 @@ services:
     image: nginx
     ports:
       - "8085:80"
-#    depends_on: [ fluentd ]
-#    logging:
-#      driver: "fluentd"
-#      options:
-#        fluentd-address: localhost:24224
-#        tag: fluent  
+    depends_on: [ fluentd ]
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: fluent
 
   # ===== Custom Applications =====
   load:
@@ -28,11 +28,11 @@ services:
       SERVER_ENDPOINTS: "workshop-logging-server-1:8080,workshop-logging-server-2:8080"
     restart: always
     depends_on: [ fluentd ]
-#    logging:
-#      driver: "fluentd"
-#      options:
-#        fluentd-address: localhost:24224
-#        tag: fluent
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: fluent
 
   server:
     image: workshop-server:devlocal
@@ -42,12 +42,12 @@ services:
       context: workshop-server
     ports:
       - "8080-8081:8080"
-#    depends_on: [ fluentd ]
-#    logging:
-#      driver: "fluentd"
-#      options:
-#        fluentd-address: localhost:24224
-#        tag: fluent
+    depends_on: [ fluentd ]
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: fluent
 
 
 
@@ -234,10 +234,23 @@ services:
       - ./configs/alertmanager/:/etc/alertmanager/
     restart: always
     command:
-      - '-config.file=/etc/alertmanager/config.yml'
-      - '-storage.path=/alertmanager'
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
     deploy:
       mode: global
+
+#  nginx-exporter:
+#    image: nginx/nginx-prometheus-exporter:0.4.2
+#    command:
+#      - --nginx.scrape-uri
+#      - "http://workshop-logging-nginx-1:8080/stub_status"
+#    depends_on:
+#      - prometheus
+#    networks:
+#      nginx_network:
+#        aliases:
+#          - nginxexporter
+#        ipv4_address: 10.10.10.50
 
 volumes:
   grafana-data:

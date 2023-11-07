@@ -1,0 +1,33 @@
+groups:
+  - name: AllInstances
+    rules:
+      - alert: ScrapeTargetDown
+        # Condition for alerting
+        expr: up == 0
+        for: 1m
+        # Annotation - additional informational labels to store more information
+        annotations:
+          title: 'Scrape target {{ $labels.instance }} down'
+          description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute.'
+        labels:
+          severity: 'critical'
+
+      - alert: NodeMemoryLow
+        # Condition for alerting
+        expr: node_memory_MemFree_bytes/node_memory_MemTotal_bytes < 0.5
+        for: 1m
+        # Annotation - additional informational labels to store more information
+        annotations:
+          title: 'Free memory on node is less than 50%'
+        labels:
+          severity: 'warning'
+
+      - alert: NodeMemoryCritical
+        # Condition for alerting
+        expr: node_memory_MemFree_bytes/node_memory_MemTotal_bytes < 0.2
+        for: 1m
+        # Annotation - additional informational labels to store more information
+        annotations:
+          title: 'Free memory on node is less than 20%'
+        labels:
+          severity: 'critical'
