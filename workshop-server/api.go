@@ -117,21 +117,20 @@ func addEndpointHandlers(g *gin.Engine) error {
 		context.JSON(http.StatusOK, "ok")
 	})
 
+	g.Handle("GET", "/api/logout", func(context *gin.Context) {
+		waitDelay()
+		handleProbabilityResponse(context, "logout successful")
+	})
 	g.Handle("GET", "/api/login", func(context *gin.Context) {
 		waitDelayScaled(2)
 		handleProbabilityResponse(context, "login successful")
 	})
-	g.Handle("GET", "/api/logout", func(context *gin.Context) {
-		waitDelayScaled(3)
-		handleProbabilityResponse(context, "logout successful")
-	})
-
 	g.Handle("GET", "/api/project", func(context *gin.Context) {
-		waitDelay()
+		waitDelayScaled(3)
 		handleProbabilityResponse(context, "get project")
 	})
 	g.Handle("POST", "/api/project", func(context *gin.Context) {
-		waitDelayScaled(3)
+		waitDelayScaled(10)
 		handleProbabilityResponse(context, "post project")
 	})
 

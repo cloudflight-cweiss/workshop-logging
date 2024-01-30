@@ -15,7 +15,7 @@ services:
       driver: "fluentd"
       options:
         fluentd-address: localhost:24224
-        tag: fluent
+        tag: nginx
 
   # ===== Custom Applications =====
   load:
@@ -32,7 +32,6 @@ services:
       driver: "fluentd"
       options:
         fluentd-address: localhost:24224
-        tag: fluent
 
   server:
     image: workshop-server:devlocal
@@ -47,16 +46,70 @@ services:
       driver: "fluentd"
       options:
         fluentd-address: localhost:24224
-        tag: fluent
+        tag: server
+
+  logapp1:
+    image: workshop-logapp:devlocal
+    build:
+      context: workshop-logapp
+    command:
+      - "--lograte"
+      - "2000"
+      - "--seed"
+      - "2000"
+    depends_on: [ fluentd ]
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: logapp.text.app1
+
+  logapp2:
+    image: workshop-logapp:devlocal
+    build:
+      context: workshop-logapp
+    command:
+      - "--lograte"
+      - "500"
+      - "--seed"
+      - "99"
+    depends_on: [ fluentd ]
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: logapp.text.app2
+
+  logapp3:
+    image: workshop-logapp:devlocal
+    build:
+      context: workshop-logapp
+    command:
+      - "--lograte"
+      - "2000"
+      - "--seed"
+      - "123"
+      - "--log"
+      - "json"
+    depends_on: [ fluentd ]
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: logapp.json.app3
 
 
 
-  # ===== Logging services =====
+  # ===== Logging services =========================================================================
   fluentd:
     build:
       context: ./configs/fluentd
+#    command:
+#      - "-c"
+#      - "/fluentd/etc/fluent.yaml"
     volumes:
-      - ./configs/fluentd/conf:/fluentd/etc
+#      - ./configs/fluentd/conf/fluent.yaml:/fluentd/etc/fluent.yaml
+      - ./configs/fluentd/conf/fluent.conf:/fluentd/etc/fluent.conf
     ports:
       - "24224:24224"
       - "24224:24224/udp"
@@ -181,7 +234,7 @@ services:
       - certs:/usr/share/kibana/config/certs
 
 
-      # ===== Monitoring services =====
+  # ===== Monitoring services ================================================================================
   prometheus:
     profiles:
       - all
@@ -192,6 +245,7 @@ services:
       - prom-data:/prometheus
     ports:
       - "9090:9090"
+
   grafana:
     profiles:
       - all
